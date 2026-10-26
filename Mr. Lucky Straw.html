@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Lucky Straw</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes walk-bounce {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            25% { transform: translateY(-8px) rotate(-1deg); }
+            75% { transform: translateY(-8px) rotate(1deg); }
+        }
+        @keyframes trade-right {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30vw, -10vh) scale(1.5) rotate(15deg); }
+            100% { transform: translate(50vw, 0) scale(1); }
+        }
+        @keyframes trade-left {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-30vw, -10vh) scale(1.5) rotate(-15deg); }
+            100% { transform: translate(-50vw, 0) scale(1); }
+        }
+        @keyframes blink {
+            0%, 96%, 100% { transform: scaleY(1); }
+            98% { transform: scaleY(0.1); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes orbit {
+            0% { transform: rotate(0deg) translateX(70px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(70px) rotate(-360deg); }
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+        }
+        @keyframes swing-leg-left {
+            0%, 100% { transform: rotate(25deg); }
+            50% { transform: rotate(-25deg); }
+        }
+        @keyframes swing-leg-right {
+            0%, 100% { transform: rotate(-25deg); }
+            50% { transform: rotate(25deg); }
+        }
+        .leg-left { animation: swing-leg-left 1s infinite ease-in-out; }
+        .leg-right { animation: swing-leg-right 1s infinite ease-in-out; }
+        .animate-walk { animation: walk-bounce 1s infinite; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animating-trade-right { animation: trade-right 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .animating-trade-left { animation: trade-left 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        .animate-pop-in { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-orbit { animation: orbit 3s linear infinite; }
+
+        .confetti-particle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="w-full h-screen flex flex-col font-sans overflow-hidden bg-[#87CEFA] select-none relative">
+
+    <!-- Background Audio from YouTube Japanese Folk Song source -->
+    <audio id="bg-audio" loop src="https://upload.wikimedia.org/wikipedia/commons/4/4b/Kuroda-bushi_-_Japanese_traditional_folk_song.ogg"></audio>
+
+    <!-- Audio Button -->
+    <button id="audio-btn" class="absolute top-4 left-4 z-50 bg-white/90 hover:bg-white text-[#2b2d42] px-3 py-2 md:px-4 md:py-3 rounded-full shadow-lg transition-transform hover:scale-110 border-2 border-[#87CEFA] font-bold flex items-center gap-2 pointer-events-auto">
+        <span id="audio-icon" class="text-xl">🔇</span>
+        <span id="audio-text" class="text-xs md:text-sm">Music Off</span>
+    </button>
+
+    <!-- SCROLLING WORLD -->
+    <div id="world-container" class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div id="scrolling-world" class="absolute top-0 left-0 h-full flex transition-transform ease-in-out" style="transition-duration: 1.5s;">
+        </div>
+        
+        <!-- Shobei Character (Fixed horizontally, bobbing on the road) -->
+        <div class="absolute bottom-[22vh] left-[10%] md:left-[15%] w-[35vw] max-w-[240px] h-[40vh] flex items-end justify-center z-20 animate-walk">
+            <div id="shobei-character" class="w-full h-full flex items-end justify-center drop-shadow-2xl">
+                <img src="SHOBEI.png" alt="Shobei" class="max-h-[38vh] w-auto object-contain drop-shadow-2xl" onerror="this.onerror=null;this.src='https://placehold.co/200x400/d4a373/2b2d42?text=SHOBEI';">
+            </div>
+            
+            <!-- Catchable Item (Dragonfly orbiting) -->
+            <div id="shobei-orbit-item" class="absolute top-[10%] left-[50%] w-16 h-16 -translate-x-1/2 -translate-y-1/2 z-50 animate-orbit hidden">
+            </div>
+
+            <!-- Shobei Held Item -->
+            <div id="shobei-held-item" class="absolute top-[50%] left-[65%] w-16 h-16 md:w-20 md:h-20 -translate-x-1/2 -translate-y-1/2 z-30 hidden">
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== STORY MODE UI ==================== -->
+    <div id="story-ui" class="absolute bottom-0 left-0 w-full h-[32vh] min-h-[190px] max-h-[300px] flex items-center justify-center p-3 z-20 pointer-events-auto" style="background: linear-gradient(to bottom, transparent 0%, #1a1a24 100%); display: flex;">
+        <div class="w-full max-w-5xl h-full bg-white/95 rounded-2xl md:rounded-3xl p-3 md:p-6 flex items-center gap-2 md:gap-6 shadow-[0_0_30px_rgba(0,0,0,0.5)] border-4 border-[#e9c46a]">
+            
+            <!-- Prev Button -->
+            <button id="prev-btn" class="shrink-0 w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center text-lg md:text-2xl font-bold transition-all bg-gray-200 text-gray-400 opacity-50">
+                ◀
+            </button>
+
+            <!-- Story Text -->
+            <div class="flex-grow h-full flex flex-col justify-center text-center px-1 md:px-3 overflow-y-auto">
+                <p id="story-text" class="text-xs sm:text-sm md:text-base lg:text-lg text-[#2b2d42] font-bold leading-snug md:leading-normal m-auto"></p>
+            </div>
+
+            <!-- Next / Action Button -->
+            <button id="next-btn" class="shrink-0 px-3 md:px-5 h-10 md:h-14 rounded-xl flex items-center justify-center text-xs sm:text-sm md:text-lg font-black uppercase tracking-wider transition-all bg-[#2a9d8f] text-white shadow-[0_4px_0_#21867a] hover:translate-y-1 active:translate-y-2">
+                Next ▶
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== UAE JOURNEY OVERVIEW UI ==================== -->
+    <div id="uae-journey-ui" class="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-md p-3 md:p-6 hidden">
+        <div class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border-6 border-[#e9c46a] animate-pop-in max-h-[95vh] flex flex-col">
+            <div class="bg-[#2a9d8f] text-white py-3 px-6 text-center shrink-0">
+                <h2 class="text-xl md:text-3xl font-black tracking-wider uppercase">From Humble Beginnings to a Better Future 🌟</h2>
+                <p class="text-xs md:text-sm font-bold mt-1 text-[#e9c46a]">Comparing Shobei's Journey with the UAE Journey</p>
+            </div>
+            <div class="p-3 md:p-6 overflow-y-auto flex-grow flex flex-col items-center justify-center bg-[#fdfcdc]">
+                <img id="uae-journey-img" src="UAE journey.png" alt="The UAE Journey" class="max-h-[60vh] w-auto object-contain rounded-2xl border-4 border-[#e9c46a] shadow-lg mb-4 bg-white" onerror="this.onerror=null;this.src='https://placehold.co/800x500/87cefa/ffffff?text=The+UAE+Journey';" />
+                <button id="start-quiz-btn" class="bg-[#ffb703] text-[#780000] px-8 py-3 rounded-xl text-lg md:text-xl font-black shadow-[0_5px_0_#fb8500] hover:translate-y-1 active:translate-y-2 transition-all uppercase tracking-widest">
+                    Start Quiz 📝
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== QUIZ MODE UI ==================== -->
+    <div id="quiz-ui" class="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 md:p-4 hidden">
+        <div class="w-full max-w-2xl bg-white rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden border-4 md:border-6 border-[#8ecae6] animate-pop-in max-h-[95vh] flex flex-col">
+            <div class="bg-[#8ecae6] text-[#023e8a] py-2 md:py-3 text-center shrink-0">
+                <h2 class="text-xl md:text-2xl font-black tracking-wider uppercase">Quiz Time! 🌟</h2>
+                <p id="quiz-progress" class="text-xs md:text-sm font-bold mt-0.5">Question 1 of 9</p>
+            </div>
+            <div class="p-3 md:p-6 overflow-y-auto flex-grow flex flex-col justify-between">
+                
+                <!-- Quiz Image Container -->
+                <div id="quiz-image-container" class="w-full flex justify-center mb-2 md:mb-3 hidden shrink-0">
+                    <img id="quiz-image" src="" alt="Question Illustration" class="max-h-28 sm:max-h-36 md:max-h-40 w-auto object-contain rounded-xl border-2 md:border-4 border-[#e9c46a] shadow-md bg-white" />
+                </div>
+                
+                <!-- Question Text -->
+                <h3 id="quiz-question" class="text-sm sm:text-base md:text-lg text-center font-bold text-[#2b2d42] mb-3 md:mb-4 shrink-0"></h3>
+                
+                <!-- Options / Textarea Container -->
+                <div id="quiz-interactive-area" class="flex flex-col gap-2.5">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== CELEBRATION MODE UI ==================== -->
+    <div id="celebration-ui" class="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 hidden">
+        <div id="confetti-container" class="absolute inset-0 z-40 pointer-events-none overflow-hidden"></div>
+        <div class="w-full max-w-xl bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 text-center shadow-2xl border-[8px] border-[#ffb703] animate-pop-in relative z-50">
+            <h1 class="text-3xl md:text-5xl font-black text-[#ff0a54] mb-2 drop-shadow-md">
+                Amazing Job! 🎉
+            </h1>
+            <p id="final-score" class="text-xl md:text-2xl text-[#2b2d42] font-bold mb-4">
+                You scored X out of Y!
+            </p>
+            <div class="flex justify-center gap-4 mb-4">
+                <div id="score-emoji" class="w-20 h-20 md:w-28 md:h-28 bg-[#e9c46a] rounded-full flex items-center justify-center shadow-inner text-4xl md:text-5xl">
+                    🌟
+                </div>
+            </div>
+            <p class="text-sm md:text-base text-[#023e8a] font-medium mb-6 px-2">
+                Remember, just like Mr. Lucky Straw and the UAE, a kind heart, hard work, and sharing with others is the greatest treasure of all!
+            </p>
+            <button id="reset-btn" class="bg-[#2a9d8f] text-white px-8 py-3.5 rounded-xl text-lg md:text-xl font-black shadow-[0_6px_0_#21867a] hover:translate-y-1 active:translate-y-2 transition-all uppercase tracking-widest pointer-events-auto">
+                Read Again 📖
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const ASSETS = {
+            ItemStraw: 'STRAW.png',
+            ItemDragonfly: 'DRAGON FLY.png',
+            ItemOranges: 'ORANGES.png',
+            ItemCloth: 'FABRIC.png',
+            ItemCoins: 'COIN.png'
+        };
+
+        const SCENES = [
+            {
+                text: "Once upon a time, long ago, there was a kind-hearted young man named Shobei who lived in a village in Japan. One day on his way home, Shobei fell down the steps that led to his village. He tumbled over and over on the ground. When he ﬁnally stopped tumbling, Shobei realised that he had caught a piece of straw in his hand. ‘Well, well,’ he said, ‘a piece of straw is a worthless thing, but I will not throw it away.’",
+                npcImage: null,
+                shobeiHolds: 'ItemStraw',
+                npcHolds: null,
+                hasTrade: false
+            },
+            {
+                text: "As Shobei went walking along, holding the straw in his hand, a dragonﬂy came ﬂying in circles around his head. ‘What an insect!’ he said. And he caught the dragonﬂy and tied the straw around its tail. Shobei went on walking, holding the dragonﬂy. He met a woman walking with her son. When the little boy saw the dragonﬂy, he started crying.",
+                npcImage: null,
+                shobeiHolds: 'ItemStraw',
+                npcHolds: null,
+                hasTrade: false,
+                hasCatch: true
+            },
+            {
+                text: "‘Mother, I want that dragonﬂy,’ he said. ‘Please, please, please!’ ‘Here you are, little boy, you can have my dragonﬂy!’ said Shobei, handing the boy the straw. To thank Shobei, the little boy’s mother gave him three oranges. Shobei thanked her.",
+                npcImage: 'BOY CRY.png',
+                shobeiHolds: 'ItemDragonfly',
+                npcHolds: 'ItemOranges',
+                hasTrade: true
+            },
+            {
+                text: "Then Shobei met a peddler resting by the road. The peddler was very thirsty. There were no streams nearby. Shobei felt sorry for him. He gave him the three oranges so that he could drink the juice. The peddler was very happy. He gave Shobei three pieces of cloth that he was carrying to the market. Shobei thanked him.",
+                npcImage: 'PEDLER.png',
+                shobeiHolds: 'ItemOranges',
+                npcHolds: 'ItemCloth',
+                hasTrade: true
+            },
+            {
+                text: "As Shobei was walking along, he came across a carriage with many attendants. The carriage belonged to a princess who was going to the town. The princess saw the beautiful pieces of cloth that Shobei was carrying. She said, ‘Oh, what pretty pieces of cloth you have there! Please let me have them.’ Shobei gave the princess the three pieces of cloth. In exchange, she gave him a large bag of coins.",
+                npcImage: 'Princess.png',
+                shobeiHolds: 'ItemCloth',
+                npcHolds: 'ItemCoins',
+                hasTrade: true
+            },
+            {
+                text: "Shobei took the coins and bought ﬁelds with them. Then he divided the ﬁelds among the people of his village. Thus everyone had their own piece of land. They all worked hard. The village became very prosperous and many new houses were built. Everyone was amazed when they remembered that all this wealth came from the piece of straw that Shobei had picked up. Shobei became the most important man in the village and everyone respected him. They addressed him as ‘Mr Lucky Straw’.",
+                npcImage: null,
+                shobeiHolds: 'ItemCoins',
+                npcHolds: null,
+                hasTrade: false
+            }
+        ];
+
+        const QUIZ_QUESTIONS = [
+            { type: 'multiple-choice', question: "1. Who is the main character?", options: ["Shobei", "A peddler", "A princess"], answerIndex: 0, imageKey: 'SHOBEI.png' },
+            { type: 'multiple-choice', question: "2. Where does the story take place?", options: ["In a village in Japan", "In a bustling city", "In a desert town"], answerIndex: 0, imageKey: 'SHOBEI.png' },
+            { type: 'multiple-choice', question: "3. What did Shobei find when he stopped tumbling?", options: ["A piece of gold", "A piece of straw", "Three oranges"], answerIndex: 1, imageKey: 'SHOBEI.png' },
+            { type: 'open-ended', question: "4. Why did Shobei give the dragonfly to the child?", imageKey: 'BOY CRY.png', possibleAnswer: "Shobei gave the dragonfly to the child to make the crying boy happy and comfort him." },
+            { type: 'open-ended', question: "5. Why did the boy’s mother give Shobei three oranges?", imageKey: 'BOY CRY.png', possibleAnswer: "She gave Shobei three oranges to thank him for kindly giving her crying son the dragonfly." },
+            { type: 'open-ended', question: "6. What did Shobei exchange the oranges for?", imageKey: 'PEDLER.png', possibleAnswer: "Shobei gave his oranges to a thirsty peddler and received three pieces of cloth in exchange." },
+            { type: 'open-ended', question: "7. What did Shobei receive in exchange for the cloth?", imageKey: 'Princess.png', possibleAnswer: "Shobei received a large bag of coins from the princess in exchange for the three pieces of cloth." },
+            { type: 'open-ended', question: "8. How did Shobei help the villagers?", imageKey: 'SHOBEI.png', possibleAnswer: "Shobei used the coins to buy fields and divided the land among the people of his village so everyone could work and thrive." },
+            { type: 'open-ended', question: "9. What lesson can we learn from the story?", imageKey: 'SHOBEI.png', possibleAnswer: "We learn that kindness, generosity, and sharing with others bring wonderful rewards and happiness to the entire community." }
+        ];
+
+        let appMode = 'story'; // 'story', 'uae-journey', 'quiz', 'celebration'
+        let sceneIndex = 0;
+        let tradeStatus = 'pre-trade'; 
+        let isPlayingAudio = false;
+        let isDragonflyCaught = false;
+
+        let currentQuizIndex = 0;
+        let quizScore = 0;
+        let isAnswering = false;
+        let showPossibleAnswer = false;
+
+        const DOM = {
+            audioBtn: document.getElementById('audio-btn'),
+            audioIcon: document.getElementById('audio-icon'),
+            audioText: document.getElementById('audio-text'),
+            bgAudio: document.getElementById('bg-audio'),
+            storyUI: document.getElementById('story-ui'),
+            uaeJourneyUI: document.getElementById('uae-journey-ui'),
+            quizUI: document.getElementById('quiz-ui'),
+            celebrationUI: document.getElementById('celebration-ui'),
+            scrollingWorld: document.getElementById('scrolling-world'),
+            shobeiOrbitItem: document.getElementById('shobei-orbit-item'),
+            shobeiHeldItem: document.getElementById('shobei-held-item'),
+            prevBtn: document.getElementById('prev-btn'),
+            nextBtn: document.getElementById('next-btn'),
+            storyText: document.getElementById('story-text'),
+            startQuizBtn: document.getElementById('start-quiz-btn'),
+            quizProgress: document.getElementById('quiz-progress'),
+            quizQuestion: document.getElementById('quiz-question'),
+            quizInteractiveArea: document.getElementById('quiz-interactive-area'),
+            quizImageContainer: document.getElementById('quiz-image-container'),
+            quizImage: document.getElementById('quiz-image'),
+            finalScore: document.getElementById('final-score'),
+            scoreEmoji: document.getElementById('score-emoji'),
+            resetBtn: document.getElementById('reset-btn'),
+            confettiContainer: document.getElementById('confetti-container')
+        };
+
+        function initApp() {
+            DOM.scrollingWorld.style.width = `${SCENES.length * 100}vw`;
+            DOM.scrollingWorld.innerHTML = SCENES.map((scene, i) => `
+                <div id="scene-wrapper-${i}" class="w-[100vw] h-full relative shrink-0">
+                    <img src="BACKGROUND.png" alt="Village Background" class="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none" onerror="this.onerror=null;this.src='https://placehold.co/1000x500/87cefa/ffffff?text=Japanese+Village+Background';" />
+                    ${i === 0 ? `
+                    <div class="absolute top-[8%] md:top-[12%] w-full flex justify-center z-10 animate-pop-in pointer-events-none">
+                        <h1 class="text-3xl sm:text-5xl md:text-7xl font-black text-[#d62828] uppercase tracking-widest text-center px-4" 
+                            style="-webkit-text-stroke: 2px #fff; filter: drop-shadow(0 6px 6px rgba(255,255,255,0.9));">
+                            Mr. Lucky Straw
+                        </h1>
+                    </div>` : ''}
+                    
+                    ${scene.npcImage ? `
+                    <div class="absolute bottom-[22vh] right-[10%] md:right-[20%] w-[35vw] max-w-[240px] h-[40vh] flex items-end justify-center animate-walk">
+                        <img src="${scene.npcImage}" alt="NPC" class="max-h-[38vh] w-auto object-contain drop-shadow-2xl" onerror="this.onerror=null;this.src='https://placehold.co/200x400/9c6644/ffffff?text=Character';" />
+                        <div id="npc-item-container-${i}" class="absolute top-[55%] left-[20%] w-16 h-16 md:w-20 md:h-20 -translate-x-1/2 -translate-y-1/2 z-30">
+                        </div>
+                        <div id="npc-trade-anim-container-${i}" class="absolute top-[55%] left-[20%] w-16 h-16 md:w-20 md:h-20 -translate-x-1/2 -translate-y-1/2 z-40 hidden">
+                        </div>
+                    </div>` : ''}
+                </div>
+            `).join('');
+
+            DOM.audioBtn.addEventListener('click', toggleAudio);
+            DOM.prevBtn.addEventListener('click', handlePrev);
+            DOM.nextBtn.addEventListener('click', handleNext);
+            DOM.startQuizBtn.addEventListener('click', () => {
+                appMode = 'quiz';
+                currentQuizIndex = 0;
+                quizScore = 0;
+                render();
+            });
+            DOM.resetBtn.addEventListener('click', resetGame);
+
+            render();
+        }
+
+        function render() {
+            DOM.storyUI.style.display = appMode === 'story' ? 'flex' : 'none';
+            DOM.uaeJourneyUI.style.display = appMode === 'uae-journey' ? 'flex' : 'none';
+            DOM.quizUI.style.display = appMode === 'quiz' ? 'flex' : 'none';
+            DOM.celebrationUI.style.display = appMode === 'celebration' ? 'flex' : 'none';
+
+            if (appMode === 'story') {
+                renderStory();
+            } else if (appMode === 'quiz') {
+                renderQuiz();
+            } else if (appMode === 'celebration') {
+                renderCelebration();
+            }
+        }
+
+        function renderStory() {
+            const scene = SCENES[sceneIndex];
+            const isFirst = sceneIndex === 0;
+            const isLastScene = sceneIndex === SCENES.length - 1;
+
+            DOM.scrollingWorld.style.transform = `translateX(-${sceneIndex * 100}vw)`;
+            DOM.storyText.innerText = scene.text;
+
+            if (isFirst) {
+                DOM.prevBtn.classList.add('bg-gray-200', 'text-gray-400', 'opacity-50');
+                DOM.prevBtn.disabled = true;
+            } else {
+                DOM.prevBtn.classList.remove('bg-gray-200', 'text-gray-400', 'opacity-50');
+                DOM.prevBtn.disabled = false;
+            }
+
+            DOM.nextBtn.className = "shrink-0 px-3 md:px-5 h-10 md:h-14 rounded-xl flex items-center justify-center text-xs sm:text-sm md:text-lg font-black uppercase tracking-wider transition-all";
+            
+            if (scene.hasCatch && !isDragonflyCaught) {
+                DOM.nextBtn.classList.add('bg-[#90e0ef]', 'text-[#023e8a]', 'shadow-[0_4px_0_#0077b6]', 'animate-pulse');
+                DOM.nextBtn.innerText = "Catch! 🦋";
+            } else if (scene.hasTrade && tradeStatus === 'pre-trade') {
+                DOM.nextBtn.classList.add('bg-[#ffb703]', 'text-[#780000]', 'shadow-[0_4px_0_#fb8500]', 'animate-pulse');
+                DOM.nextBtn.innerText = "Trade! 🔄";
+            } else if (isLastScene && tradeStatus === 'post-trade') {
+                DOM.nextBtn.classList.add('bg-[#ff0a54]', 'text-white', 'shadow-[0_4px_0_#c9184a]', 'animate-bounce');
+                DOM.nextBtn.innerText = "View UAE Journey 🌟";
+            } else {
+                DOM.nextBtn.classList.add('bg-[#2a9d8f]', 'text-white', 'shadow-[0_4px_0_#21867a]');
+                DOM.nextBtn.innerText = "Next ▶";
+            }
+
+            if (scene.hasCatch && !isDragonflyCaught) {
+                DOM.shobeiOrbitItem.innerHTML = `<img src="${ASSETS.ItemDragonfly}" alt="Dragonfly" class="w-full h-full object-contain animate-float" onerror="this.onerror=null;this.src='https://placehold.co/100x100/90e0ef/023e8a?text=🦋';" />`;
+                DOM.shobeiOrbitItem.classList.remove('hidden');
+            } else {
+                DOM.shobeiOrbitItem.classList.add('hidden');
+                DOM.shobeiOrbitItem.innerHTML = '';
+            }
+
+            let ShobeiCurrentItemKey = scene.shobeiHolds;
+            if (scene.hasCatch && isDragonflyCaught) {
+                ShobeiCurrentItemKey = 'ItemDragonfly';
+            } else if (tradeStatus === 'post-trade') {
+                ShobeiCurrentItemKey = scene.npcHolds || scene.shobeiHolds;
+            }
+
+            if (ShobeiCurrentItemKey && tradeStatus !== 'animating') {
+                const imgFile = ASSETS[ShobeiCurrentItemKey];
+                DOM.shobeiHeldItem.innerHTML = `<img src="${imgFile}" alt="Item" class="w-full h-full object-contain animate-float" onerror="this.onerror=null;this.src='https://placehold.co/100x100/ffb703/000?text=Item';" />`;
+                DOM.shobeiHeldItem.classList.remove('hidden');
+                DOM.shobeiHeldItem.classList.remove('animating-trade-right');
+            } else if (scene.hasTrade && tradeStatus === 'animating') {
+                const imgFile = ASSETS[scene.shobeiHolds];
+                DOM.shobeiHeldItem.innerHTML = `<img src="${imgFile}" alt="Item" class="w-full h-full object-contain animate-float" onerror="this.onerror=null;this.src='https://placehold.co/100x100/ffb703/000?text=Item';" />`;
+                DOM.shobeiHeldItem.classList.remove('hidden');
+                DOM.shobeiHeldItem.classList.add('animating-trade-right');
+            } else {
+                DOM.shobeiHeldItem.classList.add('hidden');
+            }
+
+            SCENES.forEach((s, i) => {
+                if (s.npcImage) {
+                    const isCurrentScene = i === sceneIndex;
+                    const npcItemContainer = document.getElementById(`npc-item-container-${i}`);
+                    const npcAnimContainer = document.getElementById(`npc-trade-anim-container-${i}`);
+                    
+                    const NpcItemKey = (isCurrentScene && tradeStatus === 'post-trade') ? s.shobeiHolds : s.npcHolds;
+
+                    if (NpcItemKey && (!isCurrentScene || tradeStatus !== 'animating')) {
+                        const imgFile = ASSETS[NpcItemKey];
+                        npcItemContainer.innerHTML = `<img src="${imgFile}" alt="Item" class="w-full h-full object-contain animate-float" onerror="this.onerror=null;this.src='https://placehold.co/100x100/ffb703/000?text=Item';" />`;
+                        npcItemContainer.classList.remove('hidden');
+                    } else {
+                        npcItemContainer.classList.add('hidden');
+                    }
+
+                    if (isCurrentScene && s.hasTrade && tradeStatus === 'animating') {
+                        const imgFile = ASSETS[s.npcHolds];
+                        npcAnimContainer.innerHTML = `<img src="${imgFile}" alt="Item" class="w-full h-full object-contain animate-float" onerror="this.onerror=null;this.src='https://placehold.co/100x100/ffb703/000?text=Item';" />`;
+                        npcAnimContainer.classList.remove('hidden');
+                        npcAnimContainer.classList.add('animating-trade-left');
+                    } else {
+                        npcAnimContainer.classList.add('hidden');
+                        npcAnimContainer.classList.remove('animating-trade-left');
+                    }
+                }
+            });
+        }
+
+        function toggleAudio() {
+            if (isPlayingAudio) {
+                DOM.bgAudio.pause();
+            } else {
+                DOM.bgAudio.play().catch(e => console.log("Audio play blocked by browser policy until interaction."));
+            }
+            isPlayingAudio = !isPlayingAudio;
+            DOM.audioIcon.innerText = isPlayingAudio ? '🎵' : '🔇';
+            DOM.audioText.innerText = isPlayingAudio ? 'Music On' : 'Music Off';
+        }
+
+        function handleNext() {
+            const scene = SCENES[sceneIndex];
+            const isLastScene = sceneIndex === SCENES.length - 1;
+
+            if (scene.hasCatch && !isDragonflyCaught) {
+                isDragonflyCaught = true;
+                render();
+            } else if (scene.hasTrade && tradeStatus === 'pre-trade') {
+                tradeStatus = 'animating';
+                render();
+                setTimeout(() => {
+                    tradeStatus = 'post-trade';
+                    render();
+                }, 1500); 
+            } else {
+                if (isLastScene && tradeStatus === 'post-trade') {
+                    appMode = 'uae-journey';
+                    render();
+                } else {
+                    sceneIndex++;
+                    tradeStatus = SCENES[sceneIndex].hasTrade ? 'pre-trade' : 'post-trade';
+                    isDragonflyCaught = false;
+                    render();
+                }
+            }
+        }
+
+        function handlePrev() {
+            if (sceneIndex > 0) {
+                sceneIndex--;
+                tradeStatus = SCENES[sceneIndex].hasTrade ? 'pre-trade' : 'post-trade';
+                isDragonflyCaught = false;
+                render();
+            }
+        }
+
+        function renderQuiz() {
+            const q = QUIZ_QUESTIONS[currentQuizIndex];
+            DOM.quizProgress.innerText = `Question ${currentQuizIndex + 1} of ${QUIZ_QUESTIONS.length}`;
+            DOM.quizQuestion.innerText = q.question;
+
+            if (q.imageKey) {
+                DOM.quizImageContainer.classList.remove('hidden');
+                DOM.quizImage.src = q.imageKey;
+                DOM.quizImage.onerror = function() {
+                    this.onerror = null;
+                    this.src = "https://placehold.co/150x150/87cefa/ffffff?text=Image";
+                };
+            } else {
+                DOM.quizImageContainer.classList.add('hidden');
+            }
+
+            DOM.quizInteractiveArea.innerHTML = '';
+
+            if (q.type === 'multiple-choice') {
+                q.options.forEach((option, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = "text-sm sm:text-base md:text-lg font-bold py-2.5 px-4 rounded-xl border-2 md:border-4 transition-all duration-300 bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200 hover:-translate-y-0.5 shadow-[0_3px_0_#d1d5db] quiz-option-btn text-left";
+                    btn.innerText = option;
+                    btn.onclick = () => handleQuizAnswer(btn, index, q.answerIndex);
+                    DOM.quizInteractiveArea.appendChild(btn);
+                });
+            } else {
+                const wrapper = document.createElement('div');
+                wrapper.className = "flex flex-col gap-2.5 animate-pop-in";
+
+                const textarea = document.createElement('textarea');
+                textarea.className = "w-full h-20 md:h-28 p-3 text-sm md:text-base text-[#2b2d42] border-2 md:border-4 border-[#8ecae6] rounded-xl focus:outline-none focus:border-[#219ebc] resize-none";
+                textarea.placeholder = "Type your thoughts here...";
+                
+                const possibleAnswerDiv = document.createElement('div');
+                possibleAnswerDiv.className = "p-3 bg-[#e9f5db] border-2 border-[#a7c957] rounded-xl text-left animate-pop-in hidden";
+                possibleAnswerDiv.innerHTML = `
+                    <p class="font-bold text-[#386641] text-xs md:text-sm mb-0.5">Possible Answer:</p>
+                    <p class="text-[#2b2d42] text-xs md:text-sm leading-snug">${q.possibleAnswer}</p>
+                `;
+
+                const actionBtn = document.createElement('button');
+                actionBtn.className = "text-sm md:text-base font-bold py-2.5 px-4 rounded-xl border-2 md:border-4 transition-all duration-300 bg-[#ffb703] border-[#fb8500] text-[#780000] shadow-[0_3px_0_#fb8500] hover:-translate-y-0.5";
+                actionBtn.innerText = "Show Possible Answer";
+                
+                actionBtn.onclick = () => handleOpenSubmit(actionBtn, textarea, possibleAnswerDiv);
+
+                wrapper.appendChild(textarea);
+                wrapper.appendChild(possibleAnswerDiv);
+                wrapper.appendChild(actionBtn);
+                DOM.quizInteractiveArea.appendChild(wrapper);
+            }
+        }
+
+        function handleQuizAnswer(clickedBtn, selectedIndex, correctIndex) {
+            if (isAnswering) return;
+            isAnswering = true;
+
+            const buttons = document.querySelectorAll('.quiz-option-btn');
+            buttons.forEach((btn, i) => {
+                btn.disabled = true;
+                btn.className = "quiz-option-btn text-sm sm:text-base md:text-lg font-bold py-2.5 px-4 rounded-xl border-2 md:border-4 transition-all duration-300 text-left";
+                if (i === correctIndex) {
+                    btn.classList.add('bg-[#a7c957]', 'border-[#6a994e]', 'text-white', 'shadow-[0_3px_0_#386641]', 'scale-[1.02]');
+                    btn.innerHTML += ' <span class="ml-2">✅</span>';
+                } else if (i === selectedIndex && selectedIndex !== correctIndex) {
+                    btn.classList.add('bg-[#e63946]', 'border-[#a80000]', 'text-white', 'shadow-[0_3px_0_#780000]', 'animate-shake');
+                    btn.innerHTML += ' <span class="ml-2">❌</span>';
+                } else {
+                    btn.classList.add('bg-gray-100', 'border-gray-200', 'text-gray-400', 'opacity-50');
+                }
+            });
+
+            if (selectedIndex === correctIndex) quizScore++;
+
+            setTimeout(() => {
+                moveToNextQuizQuestion();
+            }, 1500);
+        }
+
+        function handleOpenSubmit(btn, textarea, possibleAnswerDiv) {
+            if (isAnswering) return;
+
+            if (!showPossibleAnswer) {
+                showPossibleAnswer = true;
+                possibleAnswerDiv.classList.remove('hidden');
+                btn.innerText = "Next Answer";
+                textarea.disabled = true;
+                return;
+            }
+
+            isAnswering = true;
+            quizScore++; 
+            btn.innerText = "Great job! 🌟";
+            btn.className = "text-sm md:text-base font-bold py-2.5 px-4 rounded-xl border-2 md:border-4 transition-all duration-300 bg-gray-200 border-gray-300 text-gray-400";
+
+            setTimeout(() => {
+                moveToNextQuizQuestion();
+            }, 800);
+        }
+
+        function moveToNextQuizQuestion() {
+            isAnswering = false;
+            showPossibleAnswer = false;
+            if (currentQuizIndex < QUIZ_QUESTIONS.length - 1) {
+                currentQuizIndex++;
+                render();
+            } else {
+                appMode = 'celebration';
+                render();
+            }
+        }
+
+        function renderCelebration() {
+            DOM.finalScore.innerText = `You scored ${quizScore} out of ${QUIZ_QUESTIONS.length}!`;
+            DOM.scoreEmoji.innerText = quizScore === QUIZ_QUESTIONS.length ? '🌟' : '👍';
+            
+            DOM.confettiContainer.innerHTML = '';
+            for(let i=0; i<40; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti-particle';
+                conf.style.left = `${Math.random() * 100}vw`;
+                conf.style.top = `-5vh`;
+                conf.style.backgroundColor = ['#ff0a54', '#ffb703', '#8ecae6', '#2a9d8f'][Math.floor(Math.random() * 4)];
+                conf.style.animation = `confetti-fall ${Math.random() * 3 + 2}s linear infinite`;
+                conf.style.animationDelay = `${Math.random() * 2}s`;
+                DOM.confettiContainer.appendChild(conf);
+            }
+        }
+
+        function resetGame() {
+            appMode = 'story';
+            sceneIndex = 0;
+            currentQuizIndex = 0;
+            quizScore = 0;
+            tradeStatus = 'pre-trade';
+            isDragonflyCaught = false;
+            render();
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
